@@ -1,0 +1,40 @@
+const KEY="lhwm_v1";
+const seed={tasks:[
+{id:1,title:"Tuyển 30 lao động đơn hàng Trung Quốc",dept:"Cung ứng lao động",assignee:"Nguyễn Văn A",priority:"Cao",due:"2026-10-05",status:"Đang làm",progress:70},
+{id:2,title:"Kiểm tra hồ sơ ứng viên",dept:"Cung ứng lao động",assignee:"Trần Thị B",priority:"Cao",due:"2026-10-07",status:"Đang làm",progress:40},
+{id:3,title:"Chuẩn bị khai giảng lớp HSK1",dept:"Giáo dục",assignee:"Lê Thị C",priority:"Trung bình",due:"2026-10-03",status:"Hoàn thành",progress:100},
+{id:4,title:"Liên hệ đối tác tuyển sinh",dept:"Giáo dục",assignee:"Phạm Văn D",priority:"Thấp",due:"2026-10-12",status:"Chưa làm",progress:0}
+],employees:[
+{id:1,name:"Nguyễn Văn A",role:"Nhân viên",dept:"Cung ứng lao động"},
+{id:2,name:"Trần Thị B",role:"Nhân viên",dept:"Cung ứng lao động"},
+{id:3,name:"Lê Thị C",role:"Giáo viên/Điều phối",dept:"Giáo dục"},
+{id:4,name:"Phạm Văn D",role:"Kinh doanh",dept:"Giáo dục"}
+]};
+let db=JSON.parse(localStorage.getItem(KEY)||"null")||seed;
+let page="dashboard";
+const save=()=>localStorage.setItem(KEY,JSON.stringify(db));
+const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+function badge(t){let c=t==="Hoàn thành"?"done":t==="Đang làm"?"doing":"todo";return `<span class="badge ${c}">${esc(t)}</span>`}
+function shell(){document.getElementById("app").innerHTML=`<div class="layout"><aside class="sidebar"><div class="brand">LIÊN HOA WORK MANAGER<small>Education & Labor Supply</small></div><nav class="nav">
+<button class="${page==="dashboard"?"active":""}" onclick="go('dashboard')">📊 Dashboard</button>
+<button class="${page==="tasks"?"active":""}" onclick="go('tasks')">✅ Công việc</button>
+<button class="${page==="employees"?"active":""}" onclick="go('employees')">👥 Nhân sự</button>
+<button class="${page==="education"?"active":""}" onclick="go('education')">🎓 Giáo dục</button>
+<button class="${page==="labor"?"active":""}" onclick="go('labor')">💼 Cung ứng lao động</button>
+<button class="${page==="calendar"?"active":""}" onclick="go('calendar')">📅 Lịch công việc</button>
+</nav></aside><main class="main"><div class="top"><h1>${({dashboard:"Dashboard",tasks:"Quản lý công việc",employees:"Nhân sự",education:"Giáo dục",labor:"Cung ứng lao động",calendar:"Lịch công việc"})[page]}</h1><div class="user">👤 Giám đốc</div></div><div id="content"></div></main></div>`;render()}
+function go(p){page=p;shell()}
+function render(){const c=document.getElementById("content");if(page==="dashboard")return dashboard(c);if(page==="tasks")return tasks(c);if(page==="employees")return employees(c);if(page==="education")return filtered(c,"Giáo dục","Công việc Giáo dục");if(page==="labor")return filtered(c,"Cung ứng lao động","Công việc Cung ứng lao động");if(page==="calendar")return calendar(c)}
+function dashboard(c){let t=db.tasks,done=t.filter(x=>x.status==="Hoàn thành").length,doing=t.filter(x=>x.status==="Đang làm").length,late=t.filter(x=>x.status!=="Hoàn thành"&&x.due<"2026-09-29").length;c.innerHTML=`<div class="cards"><div class="card"><div class="label">Tổng công việc</div><div class="value">${t.length}</div></div><div class="card"><div class="label">Đang thực hiện</div><div class="value">${doing}</div></div><div class="card"><div class="label">Hoàn thành</div><div class="value">${done}</div></div><div class="card"><div class="label">Quá hạn</div><div class="value">${late}</div></div></div><div class="grid"><section class="panel"><h2>Công việc gần nhất</h2>${taskTable(t.slice().sort((a,b)=>a.due.localeCompare(b.due)).slice(0,6))}</section><section class="panel"><h2>Khối lượng theo nhân viên</h2>${db.employees.map(e=>{let n=t.filter(x=>x.assignee===e.name).length;return `<p><b>${esc(e.name)}</b> <span style="float:right">${n} việc</span></p><div class="progress"><i style="width:${Math.min(100,n*25)}%"></i></div>`}).join("")}</section></div>`}
+function taskTable(arr){return `<table><thead><tr><th>Công việc</th><th>Người phụ trách</th><th>Deadline</th><th>Tiến độ</th><th>Trạng thái</th></tr></thead><tbody>${arr.map(x=>`<tr><td><b>${esc(x.title)}</b><br><span class="label">${esc(x.dept)}</span></td><td>${esc(x.assignee)}</td><td>${esc(x.due)}</td><td>${x.progress}%</td><td>${badge(x.status)}</td></tr>`).join("")}</tbody></table>`}
+function tasks(c){c.innerHTML=`<div class="toolbar"><input id="q" class="search" placeholder="Tìm công việc..." oninput="filterTasks()"><button class="btn primary" onclick="openTask()">+ Giao công việc</button></div><section class="panel"><div id="tasklist">${taskTable(db.tasks)}</div></section>`}
+function filterTasks(){let q=document.getElementById("q").value.toLowerCase();document.getElementById("tasklist").innerHTML=taskTable(db.tasks.filter(x=>(x.title+x.assignee+x.dept).toLowerCase().includes(q)))}
+function employees(c){c.innerHTML=`<div class="toolbar"><button class="btn primary" onclick="openEmployee()">+ Thêm nhân viên</button></div><section class="panel"><table><thead><tr><th>Họ tên</th><th>Chức vụ</th><th>Phòng ban</th><th>Công việc</th></tr></thead><tbody>${db.employees.map(e=>`<tr><td><b>${esc(e.name)}</b></td><td>${esc(e.role)}</td><td>${esc(e.dept)}</td><td>${db.tasks.filter(x=>x.assignee===e.name).length}</td></tr>`).join("")}</tbody></table></section>`}
+function filtered(c,dept,title){let arr=db.tasks.filter(x=>x.dept===dept);c.innerHTML=`<section class="panel"><h2>${title}</h2>${taskTable(arr)}</section>`}
+function calendar(c){c.innerHTML=`<section class="panel"><h2>Lịch công việc theo deadline</h2>${taskTable(db.tasks.slice().sort((a,b)=>a.due.localeCompare(b.due)))}</section>`}
+function openTask(){document.body.insertAdjacentHTML("beforeend",`<div class="modal" id="modal"><div class="modalbox"><h2>Giao công việc mới</h2><form onsubmit="addTask(event)"><div class="formgrid"><label class="field full">Tên công việc<input name="title" required></label><label class="field">Phòng ban<select name="dept"><option>Giáo dục</option><option>Cung ứng lao động</option><option>Hành chính</option><option>Kinh doanh</option></select></label><label class="field">Người phụ trách<select name="assignee">${db.employees.map(e=>`<option>${esc(e.name)}</option>`).join("")}</select></label><label class="field">Deadline<input name="due" type="date" required></label><label class="field">Ưu tiên<select name="priority"><option>Cao</option><option>Trung bình</option><option>Thấp</option></select></label></div><div class="modal-actions"><button type="button" class="btn" onclick="closeModal()">Hủy</button><button class="btn primary">Giao việc</button></div></form></div></div>`)}
+function addTask(e){e.preventDefault();let f=new FormData(e.target);db.tasks.push({id:Date.now(),title:f.get("title"),dept:f.get("dept"),assignee:f.get("assignee"),priority:f.get("priority"),due:f.get("due"),status:"Chưa làm",progress:0});save();closeModal();render()}
+function openEmployee(){document.body.insertAdjacentHTML("beforeend",`<div class="modal" id="modal"><div class="modalbox"><h2>Thêm nhân viên</h2><form onsubmit="addEmployee(event)"><div class="formgrid"><label class="field full">Họ tên<input name="name" required></label><label class="field">Chức vụ<input name="role" value="Nhân viên"></label><label class="field">Phòng ban<select name="dept"><option>Giáo dục</option><option>Cung ứng lao động</option><option>Hành chính</option><option>Kinh doanh</option></select></label></div><div class="modal-actions"><button type="button" class="btn" onclick="closeModal()">Hủy</button><button class="btn primary">Lưu</button></div></form></div></div>`)}
+function addEmployee(e){e.preventDefault();let f=new FormData(e.target);db.employees.push({id:Date.now(),name:f.get("name"),role:f.get("role"),dept:f.get("dept")});save();closeModal();render()}
+function closeModal(){document.getElementById("modal")?.remove()}
+shell();
