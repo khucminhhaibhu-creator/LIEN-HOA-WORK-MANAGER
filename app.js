@@ -13,13 +13,37 @@ async function boot(){
  if(session){user=session.user;await loadCloud();shell()}else login();
  sb.auth.onAuthStateChange(async(_e,s)=>{user=s?.user||null;if(user){await loadCloud();shell()}else login()});
 }
-function login(msg=""){
- document.getElementById("app").innerHTML=`<div class="auth"><div class="authbox"><h1>LIÊN HOA</h1><p>WORK MANAGER</p><div class="authmode"><button id="loginTab" class="btn primary" onclick="authMode('login')">Đăng nhập</button><button id="signupTab" class="btn" onclick="authMode('signup')">Tạo tài khoản</button></div><form onsubmit="authSubmit(event)"><label class="field">Email<input id="email" type="email" required></label><label class="field">Mật khẩu<input id="password" type="password" minlength="6" required></label><label class="field" id="nameField" style="display:none">Họ và tên<input id="fullname"></label><p id="authMsg" class="label">${esc(msg)}</p><button class="btn primary fullbtn" id="authBtn">Đăng nhập</button></form></div></div>`;
- window.authMode=authMode; window.authSubmit=authSubmit;
+function login(msg="",email=""){
+ document.getElementById("app").innerHTML=`<div class="auth"><div class="authbox"><h1>LIÊN HOA</h1><p>WORK MANAGER</p><div class="authmode"><button id="loginTab" class="btn primary" onclick="authMode('login')">Đăng nhập</button><button id="signupTab" class="btn" onclick="authMode('signup')">Tạo tài khoản</button></div><form onsubmit="authSubmit(event)"><label class="field">Email<input id="email" type="email" value="${esc(email)}" required></label><label class="field">Mật khẩu<input id="password" type="password" minlength="6" required></label><label class="field" id="nameField" style="display:none">Họ và tên<input id="fullname"></label><p id="authMsg" class="label">${esc(msg)}</p><button class="btn primary fullbtn" id="authBtn">Đăng nhập</button></form><div class="authlinks"><button class="linkbtn" type="button" onclick="forgotPassword()">Quên mật khẩu?</button><button class="linkbtn" type="button" onclick="resendConfirmation()">Gửi lại email xác nhận</button></div></div></div>`;
+ window.authMode=authMode; window.authSubmit=authSubmit; window.forgotPassword=forgotPassword; window.resendConfirmation=resendConfirmation;
 }
 let mode="login";
 function authMode(m){mode=m;document.getElementById("nameField").style.display=m==="signup"?"block":"none";document.getElementById("authBtn").textContent=m==="signup"?"Tạo tài khoản":"Đăng nhập";document.getElementById("loginTab").className="btn "+(m==="login"?"primary":"");document.getElementById("signupTab").className="btn "+(m==="signup"?"primary":"")}
-async function authSubmit(e){e.preventDefault();let email=emailEl().value.trim(),password=passwordEl().value,fullname=document.getElementById("fullname")?.value.trim();let r=mode==="signup"?await sb.auth.signUp({email,password,options:{data:{full_name:fullname||email}}}):await sb.auth.signInWithPassword({email,password});if(r.error)login(r.error.message);else if(mode==="signup")login("Tạo tài khoản thành công. Kiểm tra email xác nhận nếu dự án yêu cầu.");}
+function authError(err){let s=(err?.message||"").toLowerCase();if(s.includes("invalid login credentials"))return "Email hoặc mật khẩu không đúng, hoặc tài khoản chưa xác nhận email.";if(s.includes("email not confirmed"))return "Email chưa được xác nhận. Hãy kiểm tra hộp thư và bấm liên kết xác nhận.";if(s.includes("user already registered"))return "Email này đã có tài khoản. Hãy đăng nhập hoặc dùng Quên mật khẩu.";return err?.message||"Có lỗi xảy ra. Vui lòng thử lại."}
+async function authSubmit(e){
+ e.preventDefault();
+ let email=emailEl().value.trim(),password=passwordEl().value,fullname=document.getElementById("fullname")?.value.trim();
+ if(!sb){login("Hệ thống đăng nhập Cloud chưa được cấu hình.");return}
+ if(mode==="signup"){
+   let r=await sb.auth.signUp({email,password,options:{data:{full_name:fullname||email}}});
+   if(r.error){login(authError(r.error),email);return}
+   if(r.data?.session){user=r.data.user;await loadCloud();shell();return}
+   login("Tài khoản đã tạo thành công. Hãy kiểm tra email để xác nhận tài khoản rồi đăng nhập.",email);
+ }else{
+   let r=await sb.auth.signInWithPassword({email,password});
+   if(r.error){login(authError(r.error),email);return}
+   user=r.data.user;await loadCloud();shell();
+ }
+}
+async function resendConfirmation(){
+ let email=emailEl()?.value.trim();if(!email){login("Nhập email trước rồi bấm gửi lại email xác nhận.");return}
+ let r=await sb.auth.resend({type:"signup",email});if(r.error)login(authError(r.error),email);else login("Đã gửi lại email xác nhận. Hãy kiểm tra Inbox và cả Spam.",email);
+}
+async function forgotPassword(){
+ let email=emailEl()?.value.trim();if(!email){login("Nhập email rồi bấm Quên mật khẩu.");return}
+ let redirectTo=location.origin+location.pathname;
+ let r=await sb.auth.resetPasswordForEmail(email,{redirectTo});if(r.error)login(authError(r.error),email);else login("Đã gửi email đặt lại mật khẩu. Hãy kiểm tra Inbox và Spam.",email);
+}
 const emailEl=()=>document.getElementById("email"),passwordEl=()=>document.getElementById("password");
 
 async function loadCloud(){
